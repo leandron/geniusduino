@@ -22,8 +22,7 @@ int ok_pin = 12;
 int input_button[] = {4,5,6,7};
 int output_led[] = {8,9,10,11};
 
-int combination_button[100];
-int combination_led[100];
+int combination[100];
 int comb_counter = 0;
 
 int game_state;
@@ -31,7 +30,6 @@ int user_input_counter;
 int pressed_button;
 bool lock_buttons = false;
 bool button_pressed_now = false;
-bool logging = true;
 
 void setup() {
   // Set the button input mode
@@ -44,9 +42,7 @@ void setup() {
   pinMode(ok_pin, OUTPUT);
   randomSeed(analogRead(0));
   
-  if (logging) {
-    Serial.begin(9600);
-  }
+  Serial.begin(9600);
   change_game_state(ST_BEGIN);
 }
 
@@ -74,7 +70,10 @@ void loop() {
 }
 
 void input_error_action() {
-  digitalWrite(error_pin, HIGH);
+    all_lights_on(200);
+    delay(200);
+    all_lights_on(200);
+    change_game_state(ST_BEGIN);
 }
 
 void input_ok_action() {
@@ -84,12 +83,7 @@ void input_ok_action() {
   change_game_state(ST_SHOW);
 }
 
-void change_game_state(int new_state) {
-  if (logging) {
-    Serial.print("state has changed:");
-    Serial.println(new_state);
-  }
-  
+void change_game_state(int new_state) { 
   game_state = new_state;
 }
 
@@ -101,12 +95,10 @@ void read_buttons_action() {
   button_pressed_now = false;
   
   for (int i=0; i < 4; i++) {
-    if ((digitalRead(input_button[i]) == HIGH) && !lock_buttons) {
-      lock_buttons = true;
+    if (digitalRead(input_button[i]) == HIGH) {
       button_pressed_now = true;
-      pressed_button = input_button[i];
-      Serial.print("button pressed:");
-      Serial.println(pressed_button);
+      pressed_button = i;
+      break;
     }
   }
   
@@ -114,66 +106,72 @@ void read_buttons_action() {
     lock_buttons = false;
   }
   
-  if (button_pressed_now && lock_buttons) {
+  if (button_pressed_now && !lock_buttons) {
+    Serial.print("pressed button: ");
+    Serial.println(pressed_button);
     verify_user_input(pressed_button);
+    lock_buttons = true;
   }
 }
 
 void verify_user_input(int pressed) {
-  Serial.print("user input counter:");
-  Serial.println(user_input_counter);
-
-  if (pressed != combination_button[user_input_counter]) {
-    Serial.print(pressed);
-    Serial.print("!=");
-    Serial.println(combination_button[user_input_counter]);
+  if (pressed != combination[user_input_counter]) {
     change_game_state(ST_INPUT_ERROR);
+    return;
   }
  
   user_input_counter++;
   
   if (user_input_counter == comb_counter) {
     user_input_counter = 0;
+    all_lights_on(1000);
     change_game_state(ST_INPUT_OK);
-  }
- 
+  } 
 } 
 
 void show_and_generate_action() {
-  int temp_int = random(4);
-  combination_led[comb_counter] = output_led[temp_int];
-  combination_button[comb_counter] = input_button[temp_int];
-  if (logging) {
-    Serial.print("next button:");
-    Serial.println(combination_button[comb_counter]);
-  }
+  combination[comb_counter] = random(1000) % 4;
   comb_counter++;
 
+  Serial.print("memory: ");
   for (int i=0; i < comb_counter; i++) {
-    Serial.print("comb:");
-    Serial.println(combination_button[i]);
-    Serial.print("comb led:");
-    Serial.println(combination_led[i]);
-    Serial.print("comb counter:");
-    Serial.println(comb_counter);
-    blink_led(combination_led[i]);
+    Serial.print(combination[i]);
+    Serial.print(" ");
+    blink_led(output_led[combination[i]], 500);
+    delay(50);
   }
+  Serial.println(" ");
 
 }
 
 void begin_action() {
   init_lights();
+  comb_counter = 0;
   change_game_state(ST_SHOW);
 }
 
 void blink_led(int pin) {
+  blink_led(pin, 500);
+}
+
+void blink_led(int pin, int time) {
   digitalWrite(pin, HIGH);
-  delay(500);
+  delay(time);
   digitalWrite(pin, LOW);  
 }
 
 void init_lights() {
   for (int i; i < sizeof(output_led); i++) {
-    blink_led(output_led[i]);
+    blink_led(output_led[i], 300);
+  }
+}
+
+void all_lights_on(int time) {
+  for (int i; i < sizeof(output_led); i++) {
+    digitalWrite(output_led[i], HIGH);
+  }
+  delay(time);
+  for (int i; i < sizeof(output_led); i++) {
+    digitalWrite(output_led[i], LOW);
   }
 }
